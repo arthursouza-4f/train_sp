@@ -10,10 +10,13 @@
     "preview": "vite preview --host",
     "data:fetch": "node scripts/fetch-data.mjs",
     "data:build": "node scripts/build-data.mjs",
-    "data": "npm run data:fetch && npm run data:build"
+    "data": "npm run data:fetch && npm run data:build",
+    "map:fetch": "node scripts/fetch-map.mjs"
   },
   "dependencies": {
-    "three": "^0.186.1"
+    "@protomaps/basemaps": "^5.7.2",
+    "maplibre-gl": "^5.24.0",
+    "pmtiles": "^4.5.0"
   },
   "devDependencies": {
     "fflate": "^0.8.3",

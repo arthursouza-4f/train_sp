@@ -1,5 +1,5 @@
 import { LINES } from './lines-meta.js';
-import { neonize, needsDarkText, lowerBound, hexToRgb } from '../core/util.js';
+import { needsDarkText, lowerBound, hexToRgb } from '../core/util.js';
 
 export async function loadNetwork(url) {
   const res = await fetch(url);
@@ -16,7 +16,8 @@ function prepare(raw) {
     const line = {
       ...meta,
       index: li,
-      neon: meta.neon ? hexToRgb(meta.neon) : neonize(meta.color),
+      rgb: hexToRgb(meta.color),
+      offsetK: meta.offset ?? 0,
       darkText: needsDarkText(meta.color),
       services: [],
       stations: [],
@@ -75,7 +76,6 @@ function prepare(raw) {
     stations,
     stationById,
     pois,
-    context: raw.context,
     sources: raw.sources,
     bbox: { minX, maxX, minZ, maxZ },
   };

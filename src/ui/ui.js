@@ -165,7 +165,7 @@ export function createUI(app) {
 
   // ---------------- estação
   function showStation(s) {
-    const linesHtml = s.lineObjs.map((l) => `<button class="badge" data-line="${l.id}" style="--c:${l.color};border:0;cursor:pointer" title="${esc(lineTitle(l))}">${l.number}</button>`).join('');
+    const linesHtml = s.lineObjs.map((l) => `<button class="badge ${l.darkText ? 'dark-text' : ''}" data-line="${l.id}" style="--c:${l.color};border:0;cursor:pointer" title="${esc(lineTitle(l))}">${l.number}</button>`).join('');
     const conn = [];
     if (s.isTransfer) {
       conn.push(`<li><span class="ci free">${ICONS.transfer}</span><span class="ct">Integração entre linhas ${s.lineObjs.map((l) => badge(l, 'sm')).join(' ')}<small>Na mesma estação</small></span><span class="tag free">GRATUITA</span></li>`);
@@ -307,7 +307,7 @@ export function createUI(app) {
         <div class="sh-head"><span class="conn"><span class="ci ${p.type}" style="width:38px;height:38px">${ICONS[p.type]}</span></span><div>
           <h2 class="sh-title">${esc(p.name)}</h2>
           <div class="sh-sub">${POI_LABEL[p.type]}</div></div></div>
-        <p style="font-size:13px;color:#cdd6ec;line-height:1.5">${desc}</p>
+        <p class="sh-desc">${desc}</p>
         ${s ? `<div class="sec-title">Estação</div><ul class="conn"><li class="clickable" data-station="${s.id}"><span class="ci free">${ICONS.train}</span>
           <span class="ct">${esc(s.name)} ${s.lineObjs.map((l) => badge(l, 'sm')).join(' ')}<small>~${p.m} m em linha reta</small></span></li></ul>` : '<p class="none">Sem estação da rede a menos de 500 m.</p>'}`,
       bind: bindClicks,

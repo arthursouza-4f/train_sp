@@ -23,26 +23,4 @@ async function download(url, name, init = {}) {
 // em sptrans.com.br/desenvolvedores). Inclui as linhas do Metrô e da CPTM.
 await download('https://files.mobilitydatabase.org/mdb-8/latest.zip', 'gtfs-sptrans.zip');
 
-// Contexto geográfico (OpenStreetMap via Overpass).
-const OVERPASS = 'https://overpass-api.de/api/interpreter';
-const overpass = (q, name) =>
-  download(OVERPASS, name, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-    body: 'data=' + encodeURIComponent(q),
-  });
-
-const BBOX = '(-23.95,-47.05,-23.15,-46.15)';
-await overpass(
-  `[out:json][timeout:120];(way["waterway"="river"]["name"~"^Rio (Tietê|Pinheiros|Tamanduateí|Juqueri|Baquirivu-Guaçu|Aricanduva|Jundiaí)$"]${BBOX};` +
-    `way["waterway"="canal"]["name"~"Pinheiros"]${BBOX};);out geom;`,
-  'osm-rivers.json',
-);
-await overpass(
-  '[out:json][timeout:120];(relation["natural"="water"]["name"~"(Billings|Guarapiranga|Rio Grande)"](-23.95,-46.9,-23.55,-46.3);' +
-    'way["natural"="water"]["name"~"(Billings|Guarapiranga)"](-23.95,-46.9,-23.55,-46.3););out geom;',
-  'osm-lakes.json',
-);
-await overpass('[out:json][timeout:120];relation(298285);out geom;', 'osm-city.json');
-
 console.log('Pronto. Agora rode: npm run data:build');

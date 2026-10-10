@@ -4,8 +4,6 @@
 // Fontes:
 //   - GTFS da SPTrans (inclui Metrô e CPTM): traçados (shapes), estações, intervalos (frequencies),
 //     terminais de ônibus.  data-raw/gtfs-sptrans.zip
-//   - OpenStreetMap (© colaboradores do OSM, ODbL): rios, represas e limite do município,
-//     apenas como contexto geográfico.  data-raw/osm-*.json
 //
 // Uso: npm run data:build
 
@@ -446,62 +444,6 @@ for (const sp of SPECIAL) {
 console.log(`\n${poiOut.length} pontos de interesse (${poiOut.filter((p) => p.station).length} integrados a estações)`);
 for (const p of poiOut.filter((p) => p.station)) console.log(`  ${p.type.padEnd(10)} ${p.name} -> ${stationOut.find((s) => s.id === p.station).name} (${p.m} m)`);
 
-// ---------------------------------------------------------------- contexto OSM
-function assembleRings(ways) {
-  // ways: arrays de [x,z]; junta pontas coincidentes
-  const segs = ways.map((w) => w.slice());
-  const rings = [];
-  const key = (p) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`;
-  while (segs.length) {
-    let ring = segs.pop();
-    let changed = true;
-    while (changed && key(ring[0]) !== key(ring.at(-1))) {
-      changed = false;
-      for (let i = 0; i < segs.length; i++) {
-        const s = segs[i];
-        if (key(s[0]) === key(ring.at(-1))) { ring = ring.concat(s.slice(1)); }
-        else if (key(s.at(-1)) === key(ring.at(-1))) { ring = ring.concat(s.slice(0, -1).reverse()); }
-        else if (key(s.at(-1)) === key(ring[0])) { ring = s.concat(ring.slice(1)); }
-        else if (key(s[0]) === key(ring[0])) { ring = s.slice().reverse().concat(ring.slice(1)); }
-        else continue;
-        segs.splice(i, 1);
-        changed = true;
-        break;
-      }
-    }
-    rings.push(ring);
-  }
-  return rings;
-}
-
-const osm = (n) => JSON.parse(readFileSync(new URL(n, RAW), 'utf8')).elements;
-const geomPts = (g) => g.map((p) => proj(p.lat, p.lon));
-
-const rivers = [];
-for (const e of osm('osm-rivers.json')) {
-  if (!e.geometry) continue;
-  const pts = simplifyDP(geomPts(e.geometry), 0.03);
-  if (pts.length > 1) rivers.push({ name: e.tags.name, major: /Tiet|Pinheiros/.test(e.tags.name), pts: flat(pts) });
-}
-
-const lakes = [];
-for (const e of osm('osm-lakes.json')) {
-  let outer;
-  if (e.type === 'relation') outer = e.members.filter((m) => m.role === 'outer' && m.geometry).map((m) => geomPts(m.geometry));
-  else if (e.geometry) outer = [geomPts(e.geometry)];
-  else continue;
-  for (const ring of assembleRings(outer)) {
-    const closed = dist(ring[0], ring.at(-1)) < 0.01;
-    const s = simplifyDP(ring, 0.04);
-    if (s.length > 3 && closed) lakes.push({ name: e.tags.name, pts: flat(s) });
-  }
-}
-
-const cityRel = osm('osm-city.json')[0];
-const cityRings = assembleRings(cityRel.members.filter((m) => m.role === 'outer' && m.geometry).map((m) => geomPts(m.geometry)))
-  .filter((r) => r.length > 50)
-  .map((r) => flat(simplifyDP(r, 0.05)));
-
 // ---------------------------------------------------------------- saída
 const out = {
   version: 1,
@@ -509,13 +451,11 @@ const out = {
   sources: {
     gtfs: 'SPTrans GTFS (via Mobility Database mdb-8)',
     gtfsDate: Object.values(zip).length ? 'feed ' + (calendar.USD?.start_date ?? '') + '–' + (calendar.USD?.end_date ?? '') : '',
-    osm: '© colaboradores do OpenStreetMap (ODbL)',
   },
   projection: { lat0: LAT0, lon0: LON0, kx: KX, kz: KZ, unit: 'km' },
   lines: lineOut,
   stations: stationOut.map(({ stops, ...s }) => s),
   pois: poiOut,
-  context: { rivers, lakes, city: cityRings },
 };
 
 mkdirSync(OUT_DIR, { recursive: true });
