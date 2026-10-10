@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#04060c" />
+    <meta name="color-scheme" content="dark" />
+    <title>TrainView SP — trens em 3D (posições estimadas)</title>
+    <meta
+      name="description"
+      content="Mapa 3D não oficial da rede de Metrô e trens metropolitanos de São Paulo, com a posição ESTIMADA dos trens a partir da tabela oficial de intervalos. Site independente, sem vínculo com Metrô, CPTM ou concessionárias."
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2304060c'/%3E%3Cpath d='M10 44 C24 40 28 22 54 18' stroke='%2300e0ff' stroke-width='6' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='38' cy='26' r='7' fill='%23fff'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene" aria-label="Mapa 3D da rede de trens de São Paulo"></canvas>
+      <div id="labels" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <div class="disclaimer" role="note">
+          <span class="warn-ico" aria-hidden="true">!</span>
+          <p class="dis-long">
+            <strong>Posições estimadas</strong> a partir da tabela oficial de intervalos — podem não refletir a operação real.
+            Site independente, <strong>sem vínculo</strong> com Metrô, CPTM, concessionárias, SPTrans ou Governo de SP.
+          </p>
+          <p class="dis-short">
+            <strong>Posições estimadas</strong> pela tabela oficial. Site independente, <strong>sem vínculo</strong> com Metrô,
+            CPTM ou concessionárias.
+          </p>
+          <button class="link-btn" data-open="about">Saiba mais</button>
+        </div>
+        <div class="brand-row">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-name">TrainView<b>SP</b></span>
+          </div>
+          <div class="status">
+            <button class="clock-btn" id="clock-btn" title="Controle de horário">
+              <span class="live-dot" id="live-dot"></span>
+              <span class="clock" id="clock">--:--</span>
+              <span class="mode" id="clock-mode">AO VIVO</span>
+            </button>
+            <div class="count" id="train-count" title="Trens em circulação (estimativa)">—</div>
+          </div>
+        </div>
+      </header>
+
+      <nav class="lines-nav" id="lines-nav" aria-label="Linhas"></nav>
+
+      <section class="sheet" id="sheet" aria-live="polite" hidden>
+        <button class="sheet-handle" id="sheet-handle" aria-label="Expandir ou recolher painel"><span></span></button>
+        <button class="sheet-close" id="sheet-close" aria-label="Fechar">×</button>
+        <div class="sheet-body" id="sheet-body"></div>
+      </section>
+
+      <div class="time-panel" id="time-panel" hidden>
+        <div class="tp-row">
+          <span class="tp-title">Horário da simulação</span>
+          <button class="chip-btn" id="tp-live">Ao vivo</button>
+        </div>
+        <input type="range" id="tp-slider" min="0" max="1439" step="1" aria-label="Horário" />
+        <div class="tp-row">
+          <span class="tp-time" id="tp-time">--:--</span>
+          <div class="tp-speeds" role="group" aria-label="Velocidade">
+            <button class="chip-btn" data-speed="1">1×</button>
+            <button class="chip-btn" data-speed="10">10×</button>
+            <button class="chip-btn" data-speed="60">60×</button>
+          </div>
+        </div>
+        <div class="tp-days" role="group" aria-label="Dia">
+          <button class="chip-btn" data-day="wkd">Dia útil</button>
+          <button class="chip-btn" data-day="sat">Sábado</button>
+          <button class="chip-btn" data-day="sun">Domingo</button>
+        </div>
+      </div>
+
+      <div class="toast" id="toast" hidden></div>
+
+      <div class="map-tools">
+        <button class="tool-btn" id="btn-reset" title="Visão geral" aria-label="Visão geral">
+          <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </button>
+        <button class="tool-btn" id="btn-tilt" title="2D / 3D" aria-label="Alternar 2D e 3D">3D</button>
+      </div>
+
+      <footer class="credits">
+        Dados: GTFS SPTrans · Contexto © colaboradores do OpenStreetMap · Projeto não oficial
+      </footer>
+
+      <dialog id="about" class="about">
+        <form method="dialog" class="about-inner">
+          <button class="sheet-close" value="close" aria-label="Fechar">×</button>
+          <h2>Sobre o TrainView SP</h2>
+          <p class="about-lead">
+            Um mapa 3D <strong>não oficial</strong> da rede sobre trilhos da Região Metropolitana de São Paulo que mostra onde
+            os trens <strong>provavelmente</strong> estão agora.
+          </p>
+
+          <h3>⚠️ Aviso importante</h3>
+          <ul>
+            <li>
+              As posições são <strong>estimadas</strong> por cálculo — não vêm de GPS nem de nenhum sistema das operadoras.
+              Atrasos, adiantamentos, falhas, greves, obras e manobras <strong>não</strong> aparecem aqui.
+            </li>
+            <li>
+              Este site é <strong>independente</strong> e não possui nenhum vínculo, parceria ou endosso de:
+              <span id="about-entities"></span>.
+            </li>
+            <li>Não use estas informações para decisões críticas. Consulte sempre os canais oficiais das operadoras.</li>
+          </ul>
+
+          <h3>Como a estimativa é feita</h3>
+          <ol>
+            <li>
+              <strong>Tabela oficial:</strong> horário de operação e intervalo entre trens de cada hora vêm do GTFS público da
+              SPTrans (que inclui Metrô e trens metropolitanos). Os trens partem dos terminais nesses intervalos. Quando a
+              tabela traz um intervalo menor que o mínimo que a sinalização permite, usamos esse mínimo.
+            </li>
+            <li>
+              <strong>Em movimento:</strong> entre duas estações o trem acelera, roda em velocidade de cruzeiro e freia
+              (perfil trapezoidal). A velocidade de cruzeiro de cada linha é calibrada para que a viagem completa feche o
+              tempo típico de percurso — velocidade comercial de ~30–45 km/h, já contando as paradas.
+            </li>
+            <li>
+              <strong>Tempo de plataforma:</strong> cada parada soma 25–45 s (mais nas estações de integração) antes de o trem
+              seguir.
+            </li>
+            <li>Distância percorrida = velocidade × tempo desde a partida, projetada sobre o traçado real da linha.</li>
+          </ol>
+
+          <h3>Fontes</h3>
+          <ul>
+            <li>GTFS SPTrans (traçados, estações, intervalos e terminais de ônibus) — <span id="about-gtfs"></span></li>
+            <li>Rios, represas e limite do município: © colaboradores do OpenStreetMap (ODbL)</li>
+            <li>Cores das linhas: padrão do mapa oficial da rede.</li>
+          </ul>
+          <p class="about-foot">Nenhuma API é consultada durante o uso: todos os dados são estáticos e carregados com a página.</p>
+        </form>
+      </dialog>
+
+      <div class="loader" id="loader">
+        <div class="loader-ring"></div>
+        <p>Carregando a rede…</p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
