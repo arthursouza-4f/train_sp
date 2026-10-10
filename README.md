@@ -9,6 +9,16 @@ mapa de verdade da cidade (inspirado no [Mini Tokyo 3D](https://minitokyo3d.com)
 > Trivia Trens, Linha Uni, SPTrans, EMTU, Governo do Estado ou Prefeitura de São Paulo. O aviso aparece fixo no topo
 > da tela e detalhado no diálogo "Saiba mais".
 
+## O que dá para fazer
+
+- Ver os trens andando em 3D sobre o mapa, tocar num trem, numa estação ou numa linha para os detalhes, seguir um trem.
+- **Buscar** estação, linha ou terminal (campo no canto; no celular, botão de lupa; atalho `/` no computador).
+- **Favoritar** estações (estrela no painel): elas ficam no começo da barra de linhas com o tempo até o próximo trem.
+  Fica salvo só no aparelho, sem login.
+- **Compartilhar** o que está na tela: o endereço acompanha a seleção (`#estacao=pinheiros`, `#linha=4`,
+  `#trem=…`, `#local=…`) e o botão de compartilhar abre o menu do celular ou copia o link.
+- Simular outro horário/dia e acelerar o relógio.
+
 ## Rodando
 
 ```bash
@@ -17,6 +27,15 @@ npm run dev        # http://localhost:5173
 npm run build      # gera dist/ (site 100% estático)
 npm run preview    # serve o dist/ para conferir
 ```
+
+Para a **prévia do link** no WhatsApp/redes funcionar, gere o build com o endereço público do site (a imagem de
+prévia precisa de endereço completo):
+
+```bash
+SITE_URL=https://seu-dominio.com.br npm run build
+```
+
+A imagem (`public/og-image.png`, 1200×630) é gerada a partir das linhas reais com `npm run og`.
 
 O `dist/` pode ser publicado em qualquer hospedagem estática (Netlify, Vercel, GitHub Pages, Cloudflare Pages, S3…).
 Os caminhos são relativos (`base: './'`), então funciona também em subpastas. A hospedagem precisa aceitar requisições
@@ -85,7 +104,10 @@ src/
   map/rails-layer.js      linhas em WebGL2: desenho na abertura, pulso na linha selecionada, rastro dos trens
   map/trains-layer.js     trens 3D (nariz em bico, faróis/lanternas, sombra, anel do selecionado)
   map/images.js           plaquinhas e ícones desenhados em canvas
-  ui/                     painéis, horário, aviso
+  ui/ui.js                painéis, barra de linhas e favoritas, horário, aviso
+  ui/search.js            busca de estações, linhas e terminais
+  ui/favorites.js         estações favoritas (localStorage)
+  ui/permalink.js         link compartilhável (seleção no endereço)
 ```
 
 ## Desempenho (mobile)

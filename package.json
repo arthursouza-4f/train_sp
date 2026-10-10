@@ -11,7 +11,8 @@
     "data:fetch": "node scripts/fetch-data.mjs",
     "data:build": "node scripts/build-data.mjs",
     "data": "npm run data:fetch && npm run data:build",
-    "map:fetch": "node scripts/fetch-map.mjs"
+    "map:fetch": "node scripts/fetch-map.mjs",
+    "og": "node scripts/make-og.mjs"
   },
   "dependencies": {
     "@protomaps/basemaps": "^5.7.2",
@@ -19,6 +20,7 @@
     "pmtiles": "^4.5.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "fflate": "^0.8.3",
     "vite": "^8.3.4"
   }

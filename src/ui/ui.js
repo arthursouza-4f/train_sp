@@ -12,8 +12,13 @@ const badge = (line, cls = '') =>
   `<span class="badge ${cls} ${line.darkText ? 'dark-text' : ''}" style="--c:${line.color}">${line.number}</span>`;
 const lineTitle = (line) => `Linha ${line.number}-${line.name}`;
 
+const ACT_ICONS = {
+  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M7 11H6a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1h-1"/></svg>',
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.6 5.2 5.8.9-4.2 4.1 1 5.7-5.2-2.7-5.2 2.7 1-5.7-4.2-4.1 5.8-.9z"/></svg>',
+};
+
 export function createUI(app) {
-  const { net, sim, clock } = app;
+  const { net, sim, clock, favorites } = app;
   const nav = $('lines-nav');
   const sheet = $('sheet');
   const body = $('sheet-body');
@@ -38,6 +43,59 @@ export function createUI(app) {
     nav.appendChild(b);
     chips.set(line.id, b);
   }
+
+  // estações favoritas: no começo da barra, com o próximo trem
+  const firstLineChip = chips.get(net.lines[0].id);
+  let favChips = [];
+  function renderFavorites() {
+    for (const b of favChips) b.remove();
+    favChips = favorites
+      .list()
+      .map((id) => net.stationById.get(id))
+      .filter(Boolean)
+      .map((st) => {
+        const b = document.createElement('button');
+        b.className = 'line-chip fav';
+        b.innerHTML = `<span class="fav-star">${ACT_ICONS.star}</span><span class="ln-name">${esc(st.name)}</span><span class="ln-count fav-eta"></span>`;
+        b.title = `${st.name} (favorita): próximo trem`;
+        b.addEventListener('click', () => app.selectStation(st));
+        b.station = st;
+        nav.insertBefore(b, firstLineChip);
+        return b;
+      });
+    updateFavEtas();
+  }
+  function updateFavEtas() {
+    if (!favChips.length) return;
+    const st = clock.state();
+    for (const b of favChips) {
+      let best = Infinity;
+      for (const row of sim.nextArrivals(b.station, st, 1)) if (row.etas.length) best = Math.min(best, row.etas[0]);
+      b.querySelector('.fav-eta').textContent = best < Infinity ? fmtMin(Math.max(0, best)) : '';
+    }
+  }
+  favorites.onChange(renderFavorites);
+  renderFavorites();
+
+  // aviso rápido (ex.: "Link copiado")
+  const snackEl = document.createElement('div');
+  snackEl.className = 'snack';
+  snackEl.setAttribute('role', 'status');
+  document.getElementById('app').appendChild(snackEl);
+  let snackTimer = 0;
+  function snack(msg) {
+    snackEl.textContent = msg;
+    snackEl.classList.add('on');
+    clearTimeout(snackTimer);
+    snackTimer = setTimeout(() => snackEl.classList.remove('on'), 2200);
+  }
+
+  /** Botões do canto do painel: favoritar (estações) e compartilhar. */
+  const actions = (station) => `<div class="sh-actions">${
+    station
+      ? `<button class="act fav ${favorites.has(station.id) ? 'on' : ''}" data-fav="${station.id}" aria-pressed="${favorites.has(station.id)}" aria-label="Favoritar estação" title="Favoritar estação">${ACT_ICONS.star}</button>`
+      : ''
+  }<button class="act" data-share aria-label="Compartilhar" title="Compartilhar link">${ACT_ICONS.share}</button></div>`;
 
   function setNavSelection(lineIds) {
     nav.classList.toggle('has-sel', lineIds.size > 0);
@@ -101,6 +159,14 @@ export function createUI(app) {
       }));
     root.querySelectorAll('[data-poi]').forEach((el) =>
       el.addEventListener('click', () => app.selectPoi(net.pois[+el.dataset.poi])));
+    root.querySelectorAll('[data-share]').forEach((el) => el.addEventListener('click', () => app.share()));
+    root.querySelectorAll('[data-fav]').forEach((el) =>
+      el.addEventListener('click', () => {
+        const on = favorites.toggle(el.dataset.fav);
+        el.classList.toggle('on', on);
+        el.setAttribute('aria-pressed', String(on));
+        snack(on ? 'Estação adicionada às favoritas' : 'Estação removida das favoritas');
+      }));
   };
 
   // ---------------- linha
@@ -129,6 +195,7 @@ export function createUI(app) {
       type: 'line',
       ref: line,
       html: `
+        ${actions()}
         <div class="sh-head">${badge(line)}<div>
           <h2 class="sh-title">${lineTitle(line)}</h2>
           <div class="sh-sub">${esc(line.system)} · operação: ${esc(line.operator)}</div></div></div>
@@ -189,6 +256,7 @@ export function createUI(app) {
       type: 'station',
       ref: s,
       html: `
+        ${actions(s)}
         <div class="sh-head"><div>
           <h2 class="sh-title">${esc(s.name)}</h2>
           <div class="sh-sub">${sub}</div>
@@ -232,6 +300,7 @@ export function createUI(app) {
       type: 'train',
       ref: tr,
       html: `
+        ${actions()}
         <div class="sh-head">${badge(line)}<div>
           <h2 class="sh-title">Sentido ${esc(run.headsign)}</h2>
           <div class="sh-sub">${lineTitle(line)} · trem estimado</div></div></div>
@@ -304,6 +373,7 @@ export function createUI(app) {
       type: 'poi',
       ref: p,
       html: `
+        ${actions()}
         <div class="sh-head"><span class="conn"><span class="ci ${p.type}" style="width:38px;height:38px">${ICONS[p.type]}</span></span><div>
           <h2 class="sh-title">${esc(p.name)}</h2>
           <div class="sh-sub">${POI_LABEL[p.type]}</div></div></div>
@@ -413,6 +483,7 @@ export function createUI(app) {
   });
 
   let tickAcc = 0;
+  let favAcc = 0;
   return {
     setNavSelection,
     showLine,
@@ -420,12 +491,19 @@ export function createUI(app) {
     showTrain,
     showPoi,
     close,
+    snack,
+    updateFavEtas,
     get view() {
       return view;
     },
     frame(dt, state, total) {
       updateStatus(state, total);
       tickAcc += dt;
+      favAcc += dt;
+      if (favAcc > 10) {
+        favAcc = 0;
+        updateFavEtas();
+      }
       if (tickAcc > 0.5) {
         tickAcc = 0;
         view?.tick?.();

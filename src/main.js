@@ -11,6 +11,9 @@ import { addMapImages } from './map/images.js';
 import { createRailsLayer } from './map/rails-layer.js';
 import { createTrainsLayer } from './map/trains-layer.js';
 import { createUI } from './ui/ui.js';
+import { createSearch } from './ui/search.js';
+import { createFavorites } from './ui/favorites.js';
+import { createPermalink } from './ui/permalink.js';
 import { clamp, easeInOutCubic } from './core/util.js';
 
 const INTRO = 3.2; // s: linhas se desenhando + câmera descendo até a visão inicial
@@ -146,8 +149,16 @@ async function main() {
   const focusStation = (s) =>
     ease({ center: geo.toLngLat(s.x, s.z), zoom: clamp(map.getZoom(), 13.4, 15.5), pitch: clamp(map.getPitch(), 30, 55) });
 
+  // link compartilhável: a seleção vai para o endereço (sem criar entradas no histórico)
+  const permalink = createPermalink(net);
+  function syncUrl() {
+    const hash = permalink.hashFor(sel);
+    if (hash !== location.hash) history.replaceState(null, '', hash || location.pathname + location.search);
+  }
+
   function applySelection() {
     layers?.setSelection(sel.lines, sel.station);
+    syncUrl();
     const st = sel.station;
     trainsL.setPulse(st, st ? (st.isTransfer ? [0.12, 0.12, 0.13] : st.lineObjs[0].rgb) : null);
     ui.setNavSelection(sel.lines);
@@ -196,10 +207,40 @@ async function main() {
     if (fly) resetView();
   }
 
+  const favorites = createFavorites();
+
+  async function share() {
+    const url = location.href;
+    let title = 'TrainView SP — trens de São Paulo em 3D';
+    if (sel.train) title = `Trem da Linha ${sel.train.line.number}-${sel.train.line.name} sentido ${sel.train.run.headsign} (posição estimada)`;
+    else if (sel.poi) title = `${sel.poi.name} no TrainView SP`;
+    else if (sel.station) title = `Estação ${sel.station.name}: próximos trens no TrainView SP`;
+    else if (sel.lines.size === 1) {
+      const l = net.lineById.get([...sel.lines][0]);
+      title = `Linha ${l.number}-${l.name} em tempo real no TrainView SP`;
+    }
+    if (navigator.share && isMobile) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      ui.snack('Link copiado');
+    } catch {
+      window.prompt('Copie o link:', url);
+    }
+  }
+
   const app = {
     net,
     sim,
     clock,
+    favorites,
+    share,
     selectLine,
     selectStation,
     selectTrain,
@@ -218,6 +259,31 @@ async function main() {
     },
   };
   const ui = createUI(app);
+  createSearch(app, favorites);
+
+  /** Abre a seleção descrita no endereço (link compartilhado). Retorna se havia algo para abrir. */
+  function applyHash() {
+    const t = permalink.parse(location.hash);
+    if (!t) return false;
+    if (t.type === 'station') selectStation(t.ref);
+    else if (t.type === 'line') selectLine(t.ref);
+    else if (t.type === 'poi') selectPoi(t.ref);
+    else if (t.type === 'train') {
+      sim.update(clock.state());
+      const tr = sim.byId.get(t.ref);
+      if (tr) selectTrain(tr);
+      else if (t.line) {
+        selectLine(t.line);
+        ui.snack('Esse trem já terminou a viagem. Mostrando a linha.');
+      } else return false;
+    }
+    return true;
+  }
+  window.addEventListener('hashchange', () => {
+    if (!layers || applyHash()) return;
+    if (location.hash) syncUrl(); // link inválido: volta para o endereço da seleção atual
+    else clearSelection(true);
+  });
 
   // ------------------------------------------------------------ etiqueta do trem selecionado
   const tag = document.createElement('div');
@@ -339,14 +405,13 @@ async function main() {
     map.addLayer(railsL.layer, 'rail-hit');
     map.addLayer(trainsL.layer, 'rail-shields');
     layers.setSelection(sel.lines, sel.station);
-    if (REDUCED_MOTION) {
-      finishIntro();
-      resetView(0);
-    } else {
+    if (REDUCED_MOTION) finishIntro();
+    else {
       railsL.setReveal(0);
       introStart = performance.now();
-      resetView(INTRO * 1000);
     }
+    // link compartilhado: vai direto para a seleção; senão, visão geral
+    if (!applyHash()) resetView(REDUCED_MOTION ? 0 : INTRO * 1000);
     syncTilt();
     loader.classList.add('out');
     setTimeout(() => loader.remove(), 800);
